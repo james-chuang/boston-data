@@ -1,0 +1,68 @@
+---
+output:
+  html_document:
+    toc: TRUE
+    fig_width: 4.5
+    css: /home/ebosi/github/james-chuang.github.io/_sass/_style.scss
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r import and clean data}
+library(tibble)
+library(dplyr)
+library(ggplot2)
+library(ggmap)
+
+raw = read.csv('311__Service_Requests.csv')
+df = as_data_frame(raw)
+clean = df %>% select(REASON, TYPE, LATITUDE, LONGITUDE)
+
+abandoned.bikes = clean %>% filter(REASON == "Abandoned Bicycle")
+air.pollution = clean %>% filter(REASON == "Air Pollution Control")
+noise = clean %>% filter(REASON == "Generic Noise Disturbance" | REASON == "Noise Disturbance")
+graffiti = clean %>% filter(REASON == "Graffiti" | TYPE == "PWD Graffiti")
+mbta = clean %>% filter(REASON == "MBTA")
+potholes = clean %>% filter(REASON == "Pothole" | TYPE == "Pothole Repair (Internal)")
+```
+
+```{r plots}
+boston.coord = c(left=-71.20, bottom = 42.22, right = -70.98, top = 42.40)
+boston.map = get_stamenmap(boston.coord, zoom=12, maptype= "toner-lite") %>% ggmap()
+
+(pothole.map = boston.map +
+                geom_point(data = potholes, aes(x=LONGITUDE, y=LATITUDE), alpha = 0.4)
+)
+(bikes.map = boston.map +
+                geom_point(data = abandoned.bikes, aes(x=LONGITUDE, y = LATITUDE))
+)
+(noise.map = boston.map +
+                geom_point(data  = noise, aes(x=LONGITUDE, y = LATITUDE))
+)
+(graffiti.map = boston.map +
+                geom_point(data  = graffiti, aes(x=LONGITUDE, y = LATITUDE), alpha = 0.1)
+)
+(mbta.map = boston.map +
+                geom_point(data  = mbta, aes(x=LONGITUDE, y = LATITUDE))
+)
+```
+
+```{r police data}
+crime.raw = read.csv('Crime_Incident_Reports__August_2015_-_To_Date___Source__New_System_.csv')
+crime.df = as_data_frame(crime.raw)
+crime.df$DAY.OF.WEEK = factor(crime.df$DAY.OF.WEEK, levels = c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"), ordered = TRUE)
+crime.df$OFFENSE.CODE = factor(crime.df$OFFENSE.CODE)
+timeofday = strptime(crime.df$OCCURRED.ON.DATE, format="%m/%d/%Y %R:%S %p")
+minutes = as.numeric(strftime(timeofday, format = "%M"))/60
+crime.df$Hour = crime.df$Hour + minutes
+
+crime.clean = crime.df %>% select(OFFENSE.CODE, OFFENSE.CODE.GROUP, OFFENSE.DESCRIPTION, OCCURRED.ON.DATE, Hour, DAY.OF.WEEK, LAT, LONG)
+
+car.accidents = crime.clean %>% filter(OFFENSE.CODE.GROUP == "Motor Vehicle Accident Response")
+
+(accidents.map = boston.map +
+                  geom_point(data = car.accidents, aes(x=LONG, y=LAT), alpha = 0.1)
+)
+```
